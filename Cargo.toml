@@ -1,0 +1,11 @@
+[package]
+name = "difftastic-mini"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# crossterm: terminal colors + cursor control. Works perfectly on WSL2.
+# This is the standard in 2026 — cross-platform, actively maintained.
+# Alternative was `termion` but it's Unix-only. crossterm works everywhere.
+similar = "2.6"
+crossterm = "0.28"
