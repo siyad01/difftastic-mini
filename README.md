@@ -34,7 +34,7 @@ Everything else stays white.
 
 ## What it looks like
 
-![difftastic-mini output](docs/screenshot.png)
+![difftastic-mini output](image.png)
 
 ```text
 ────────────────────────────────────────────────────────────────────────────────
