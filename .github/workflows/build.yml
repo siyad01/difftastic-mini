@@ -1,38 +1,34 @@
-name: Build and Test
+name: Build difftastic-mini
 
 on:
   push:
-    branches: [main]
-  pull_request:
+    tags: ['v*']
+  workflow_dispatch:
 
 jobs:
-  test:
-    name: Test on ${{ matrix.os }}
+  build:
     strategy:
       matrix:
         include:
           - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            artifact: difftastic-mini-linux
+            name: Linux
+            binary: difftastic-mini-linux
           - os: macos-latest
-            target: x86_64-apple-darwin
-            artifact: difftastic-mini-macos
+            name: macOS
+            binary: difftastic-mini-macos
           - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            artifact: difftastic-mini-windows.exe
+            name: Windows
+            binary: difftastic-mini-windows.exe
 
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
 
-      - name: Cache cargo registry
+      - name: Cache cargo
         uses: actions/cache@v4
         with:
           path: |
@@ -44,19 +40,80 @@ jobs:
       - name: Run tests
         run: cargo test
 
-      - name: Build release binary
-        run: cargo build --release --target ${{ matrix.target }}
-
-      - name: Upload binary (Linux / macOS)
+      - name: Build release binary (Linux / macOS)
         if: matrix.os != 'windows-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact }}
-          path: target/${{ matrix.target }}/release/difftastic-mini
+        run: |
+          cargo build --release
+          cp target/release/difftastic-mini ${{ matrix.binary }}
 
-      - name: Upload binary (Windows)
+      - name: Build release binary (Windows)
         if: matrix.os == 'windows-latest'
+        run: |
+          cargo build --release
+          cp target/release/difftastic-mini.exe ${{ matrix.binary }}
+
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
-          path: target/${{ matrix.target }}/release/difftastic-mini.exe
+          name: difftastic-mini-${{ matrix.name }}
+          path: ${{ matrix.binary }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: "difftastic-mini ${{ github.ref_name }}"
+          body: |
+            ## difftastic-mini ${{ github.ref_name }}
+
+            A `diff` replacement that shows side-by-side word-level changes in the terminal.
+            Single static binary. No runtime required.
+
+            | Platform | File |
+            |----------|------|
+            | Linux    | `difftastic-mini-linux` |
+            | macOS    | `difftastic-mini-macos` |
+            | Windows  | `difftastic-mini-windows.exe` |
+
+            ### Install
+
+            ```bash
+            # Linux / macOS
+            chmod +x difftastic-mini-linux
+            mv difftastic-mini-linux ~/.local/bin/difftastic-mini
+            difftastic-mini --help
+
+            # Or build from source
+            git clone https://github.com/siyad01/difftastic-mini
+            cd difftastic-mini
+            cargo build --release
+            cp target/release/difftastic-mini ~/.local/bin/
+            ```
+
+            ### Use as a git difftool
+
+            ```bash
+            git config --global diff.tool difftastic-mini
+            git config --global difftool.difftastic-mini.cmd 'difftastic-mini "$LOCAL" "$REMOTE"'
+            git config --global difftool.prompt false
+            ```
+
+            ### What's in this release
+            - Myers diff algorithm via `similar` (same library cargo uses internally)
+            - Word-level highlighting inside every changed line
+            - Side-by-side and unified render modes
+            - `--no-color`, `--width=N`, `--unified` flags
+            - 8 passing correctness tests
+            - Works on Linux, macOS, Windows, WSL2
+          files: |
+            difftastic-mini-Linux/difftastic-mini-linux
+            difftastic-mini-macOS/difftastic-mini-macos
+            difftastic-mini-Windows/difftastic-mini-windows.exe
